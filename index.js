@@ -38,15 +38,35 @@ const run = async () => {
     try {
         const productCollection = client.db('atlasMobile').collection('products');
         const usersCollection = client.db('atlasMobile').collection('users');
+        const bookingsCollection = client.db('atlasMobile').collection('bookings');
 
+        app.get('/products', async (req, res) => {
+            let query = {};
+            if(req.query.categoryId){
+                query = {
+                    categoryId : req.query.categoryId
+                }
+            }
+            const products = await productCollection.find(query).toArray();
+            res.send(products)
+        })
+
+        
         app.get('/products', async (req, res) => {
             const query = {};
             const products = await productCollection.find(query).toArray();
             res.send(products)
         })
+
         app.post('/users', async (req, res) => {
             const user = req.body;
             const result = await usersCollection.insertOne(user);
+            res.send(result)
+        })
+
+        app.post('/bookings' , async(req , res ) => {
+            const booking = req.body;
+            const result = await bookingsCollection.insertOne(booking);
             res.send(result)
         })
         // Jwt toke 
