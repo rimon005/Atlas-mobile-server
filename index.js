@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 require('dotenv').config()
+const stripe = require("stripe")(process.env.STRIPE_SK);
 
 // port 
 const port = process.env.PORT || 5000;
@@ -34,17 +35,31 @@ const verifyJWT = (req, res, next) => {
 
 }
 
+
+
+
 const run = async () => {
     try {
         const productCollection = client.db('atlasMobile').collection('products');
         const usersCollection = client.db('atlasMobile').collection('users');
         const bookingsCollection = client.db('atlasMobile').collection('bookings');
+        const paymentsCollection = client.db('atlasMobile').collection('payments');
+
+        const verifyAdmin = async (req , res , next) => {
+            const decodedEmail = req.decoded.email;
+            const query = { email : decodedEmail};
+            const user = await usersCollection.find(query);
+            if(user?.role !== 'admin'){
+                res.status(403).send({ message: "forbidden access" })
+            }
+            next()
+        }
 
         app.get('/products', async (req, res) => {
             let query = {};
-            if(req.query.categoryId){
+            if(req.query.categoryName){
                 query = {
-                    categoryId : req.query.categoryId
+                    categoryName : req.query.categoryName
                 }
             }
             const products = await productCollection.find(query).toArray();
@@ -64,19 +79,18 @@ const run = async () => {
             res.send(result)
         })
 
-        app.get('/users/buyer' , async(req , res) => {
+        app.get('/users' , async(req , res) => {
             let query = {}
             if(req.query.role){
                 query = {
                     role : req.query.role
                 }
             }
-            console.log(query);
             const users = await usersCollection.find(query).toArray();
             res.send(users)
         })
 
-        app.put('/users/admin/:id' , async(req , res) => {
+        app.put('/users/admin/:id' ,verifyJWT,  verifyAdmin, async(req , res) => {
             const id = req.params.id;
             const query = {_id:ObjectId(id)};
             const options = { upsert: true };
@@ -108,6 +122,13 @@ const run = async () => {
             res.send(result)
         })
 
+        app.get('/bookings/:id' , async(req , res) => {
+            const id = req.params.id;
+            const query = {_id:ObjectId(id)};
+            const booking = await bookingsCollection.findOne(query);
+            res.send(booking)
+        })
+
         app.get('/bookings' , verifyJWT,  async(req , res) => {
             const email = req.query.email;
             const decodedEmail = req.decoded.email
@@ -118,6 +139,45 @@ const run = async () => {
             const bookings = await bookingsCollection.find(query).toArray();
             res.send(bookings)
         })
+
+
+        app.post('/payments' , async (req , res) => {
+            const payment = req.body;
+            const result = await paymentsCollection.insertOne(payment);
+            const id = payment.bookingId;
+            const filter = {_id:ObjectId(id)};
+            const updatedDoc = {
+                $set: {
+                    paid : true
+                }
+            }
+
+            const updatedResult = await bookingsCollection.updateOne(filter , updatedDoc);
+            res.send(result)
+
+        })
+
+
+        app.post('/create-payment-intent', async (req, res) => {
+            const booking = req.body;
+            const productPrice = booking.productPrice;
+            const amount = productPrice * 100;
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: "usd",
+                automatic_payment_methods: {
+                    enabled: true,
+                },
+            })
+
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+
+        })
+
+
         // Jwt toke 
         app.get('/jwt', async (req, res) => {
             const email = req.query.email;
