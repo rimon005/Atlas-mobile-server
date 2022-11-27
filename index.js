@@ -73,6 +73,12 @@ const run = async () => {
             res.send(products)
         })
 
+        app.post('/products' , async(req , res) => {
+            const product = req.body;
+            const result = await productCollection.insertOne(product);
+            res.send(result)
+        })
+
         app.post('/users', async (req, res) => {
             const user = req.body;
             const result = await usersCollection.insertOne(user);
@@ -88,6 +94,13 @@ const run = async () => {
             }
             const users = await usersCollection.find(query).toArray();
             res.send(users)
+        })
+
+        app.delete('/users/:id' ,verifyJWT , verifyAdmin , async(req , res) => {
+            const id = req.params.id;
+            const filter = {_id:ObjectId(id)};
+            const result = await usersCollection.deleteOne(filter);
+            res.send(result)
         })
 
         app.put('/users/admin/:id' ,verifyJWT,  verifyAdmin, async(req , res) => {
