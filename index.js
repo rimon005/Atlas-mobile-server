@@ -171,6 +171,15 @@ const run = async () => {
         })
 
 
+
+        app.get('/payments/:id' , async(req , res) => {
+            const id = req.params.id; 
+            const query = {productId: id};
+            const result = await paymentsCollection.findOne(query)
+            res.send(result)
+        })
+
+
         app.post('/create-payment-intent', async (req, res) => {
             const booking = req.body;
             const productPrice = booking.productPrice;
